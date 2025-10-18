@@ -1,10 +1,20 @@
+import Image from "next/image"
+
 export function Footer() {
   return (
     <footer className="bg-primary text-primary-foreground py-12 md:py-16">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12 mb-8">
           <div>
-            <h3 className="text-xl font-bold mb-4">PAT PRO CLEANING</h3>
+            <div className="mb-4">
+              <Image
+                src="/PatPro_logo.png"
+                alt="Pat Pro Cleaning"
+                width={320}
+                height={107}
+                className="h-40 w-auto brightness-0 invert"
+              />
+            </div>
             <p className="text-primary-foreground/80 leading-relaxed">
               Professional cleaning services you can trust. Excellence in every detail.
             </p>
