@@ -5,9 +5,11 @@ import { Button } from "@/components/ui/button"
 import { Menu, X, User } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
+import { UserButton, useAuth } from "@clerk/nextjs" // <- ONLY NEW LINES
 
 export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const { isSignedIn } = useAuth() // <- ONLY NEW LINE
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-sm border-b border-border">
@@ -43,15 +45,20 @@ export function Header() {
           </nav>
 
           <div className="hidden md:flex items-center gap-4">
-            <Link href="/login">
-              <Button variant="outline" size="lg">
-                <User className="h-4 w-4 mr-2" />
-                Login
-              </Button>
-            </Link>
             <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90">
               Book Now
             </Button>
+            {isSignedIn ? ( // <- ONLY NEW CONDITION
+              <UserButton afterSignOutUrl="/" />
+            ) : (
+              <Link href="/sign-in">
+                <Button variant="outline" size="lg">
+                  <User className="h-4 w-4 mr-2" />
+                  Login
+                </Button>
+              </Link>
+            )}
+            
           </div>
 
           {/* Mobile Menu Button */}
@@ -92,12 +99,18 @@ export function Header() {
               >
                 Contact
               </a>
-              <Link href="/login" onClick={() => setIsMenuOpen(false)}>
-                <Button variant="outline" size="lg" className="w-full bg-transparent">
-                  <User className="h-4 w-4 mr-2" />
-                  Login
-                </Button>
-              </Link>
+              {isSignedIn ? ( // <- ONLY NEW CONDITION
+                <div className="pt-2">
+                  <UserButton afterSignOutUrl="/" />
+                </div>
+              ) : (
+                <Link href="/sign-in" onClick={() => setIsMenuOpen(false)}>
+                  <Button variant="outline" size="lg" className="w-full bg-transparent">
+                    <User className="h-4 w-4 mr-2" />
+                    Login
+                  </Button>
+                </Link>
+              )}
               <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90 w-full">
                 Book Now
               </Button>

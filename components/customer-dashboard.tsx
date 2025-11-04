@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import { useAuth } from "@/lib/auth-context"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -19,7 +18,7 @@ type Booking = {
 }
 
 export function CustomerDashboard() {
-  const { user, logout } = useAuth()
+ 
   const router = useRouter()
   const [showBookingForm, setShowBookingForm] = useState(false)
 
@@ -43,10 +42,6 @@ export function CustomerDashboard() {
     },
   ])
 
-  const handleLogout = () => {
-    logout()
-    router.push("/")
-  }
 
   const upcomingBookings = bookings.filter((b) => b.status === "upcoming")
   const pastBookings = bookings.filter((b) => b.status === "completed")
@@ -59,8 +54,8 @@ export function CustomerDashboard() {
           <div className="flex items-center justify-between h-16">
             <h1 className="text-xl font-bold text-primary">PAT PRO CLEANING</h1>
             <div className="flex items-center gap-4">
-              <span className="text-sm text-muted-foreground">Welcome, {user?.name}</span>
-              <Button variant="outline" size="sm" onClick={handleLogout}>
+              <span className="text-sm text-muted-foreground">Welcome, Sahr</span>
+              <Button variant="outline" size="sm" >
                 <LogOut className="h-4 w-4 mr-2" />
                 Logout
               </Button>
@@ -216,8 +211,8 @@ export function CustomerDashboard() {
                     <User className="h-8 w-8 text-primary" />
                   </div>
                   <div>
-                    <p className="font-semibold">{user?.name}</p>
-                    <p className="text-sm text-muted-foreground">{user?.email}</p>
+                    <p className="font-semibold">Sahr</p>
+                    <p className="text-sm text-muted-foreground">sahr@example.com</p>
                   </div>
                 </div>
                 <Button variant="outline">Edit Profile</Button>

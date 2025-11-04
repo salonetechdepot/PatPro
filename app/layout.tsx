@@ -1,33 +1,36 @@
-import type React from "react"
 import type { Metadata } from "next"
 import { GeistSans } from "geist/font/sans"
 import { GeistMono } from "geist/font/mono"
 import { Analytics } from "@vercel/analytics/next"
-import { Suspense } from "react"
-import { AuthProvider } from "@/lib/auth-context"
+import { ClerkProvider } from "@clerk/nextjs"
 import "./globals.css"
 
 export const metadata: Metadata = {
   title: "Pat Pro Cleaning - Professional Cleaning Services",
   description: "Expert cleaning services for your home and business",
-  generator: "v0.app",
 }
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode
-}>) {
+}) {
   return (
-    <html lang="en">
-      <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable} antialiased`}>
-        <AuthProvider>
-          <Suspense fallback={null}>
-            {children}
-            <Analytics />
-          </Suspense>
-        </AuthProvider>
-      </body>
-    </html>
+    <ClerkProvider
+      publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY!}
+      signInUrl="/sign-in"
+      signUpUrl="/sign-up"
+      afterSignInUrl="/"
+      afterSignUpUrl="/"
+    >
+      <html lang="en">
+        <body
+          className={`${GeistSans.variable} ${GeistMono.variable} font-sans antialiased`}
+        >
+          {children}
+          <Analytics />
+        </body>
+      </html>
+    </ClerkProvider>
   )
 }

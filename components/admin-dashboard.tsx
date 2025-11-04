@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import { useAuth } from "@/lib/auth-context"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -111,7 +110,7 @@ type AdminUser = {
 }
 
 export function AdminDashboard() {
-  const { user, logout } = useAuth()
+
   const router = useRouter()
 
   // Mock data
@@ -422,7 +421,7 @@ export function AdminDashboard() {
           <div className="flex items-center justify-between h-16">
             <h1 className="text-xl font-bold text-primary">PAT PRO CLEANING - Admin</h1>
             <div className="flex items-center gap-4">
-              <span className="text-sm text-muted-foreground">Welcome, {user?.name}</span>
+              <span className="text-sm text-muted-foreground">Welcome, Sahr</span>
               <Button variant="outline" size="sm" onClick={handleLogout}>
                 <LogOut className="h-4 w-4 mr-2" />
                 Logout
