@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import type { Booking , BookingStatus} from "@prisma/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -37,28 +38,23 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import { toast } from "sonner"
 import { Switch } from "@/components/ui/switch"
+import { createService } from "../lib/server-actions"
+import { deleteService } from "../lib/server-actions"
+import { updateService } from "../lib/server-actions"
+import { confirmBooking, cancelBooking, completeBooking } from "../lib/server-actions"
 
-type Booking = {
-  id: string
-  customerName: string
-  customerEmail: string
-  service: string
-  date: string
-  time: string
-  status: "pending" | "confirmed" | "completed" | "cancelled"
-  address: string
-  amount: number
+type Props = { 
+  serverServices: any[] 
+  serverCustomers: any[]
+  serverBookings?: any[]
 }
 
-type Customer = {
-  id: string
-  name: string
-  email: string
-  phone: string
-  totalBookings: number
-  lastBooking: string
-}
+
+
+
+
 
 type Staff = {
   id: string
@@ -70,14 +66,7 @@ type Staff = {
   assignedJobs: number
 }
 
-type Service = {
-  id: string
-  name: string
-  description: string
-  price: number
-  duration: string
-  category: string
-}
+
 
 type Lead = {
   id: string
@@ -109,73 +98,24 @@ type AdminUser = {
   lastLogin: string
 }
 
-export function AdminDashboard() {
+export function AdminDashboard({
+  serverServices = [],
+  serverCustomers = [],
+  serverBookings = [],
+}: Props) {
 
   const router = useRouter()
+  //service refresh state
+  const [addOpen, setAddOpen] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
+  const [editing, setEditing] = useState<any>(null)
 
-  // Mock data
-  const [bookings] = useState<Booking[]>([
-    {
-      id: "1",
-      customerName: "John Doe",
-      customerEmail: "john@example.com",
-      service: "Deep Cleaning",
-      date: "2025-01-15",
-      time: "10:00 AM",
-      status: "confirmed",
-      address: "123 Main St, City",
-      amount: 150,
-    },
-    {
-      id: "2",
-      customerName: "Jane Smith",
-      customerEmail: "jane@example.com",
-      service: "Regular Cleaning",
-      date: "2025-01-16",
-      time: "2:00 PM",
-      status: "pending",
-      address: "456 Oak Ave, City",
-      amount: 100,
-    },
-    {
-      id: "3",
-      customerName: "Bob Johnson",
-      customerEmail: "bob@example.com",
-      service: "Office Cleaning",
-      date: "2025-01-14",
-      time: "9:00 AM",
-      status: "completed",
-      address: "789 Business Blvd, City",
-      amount: 200,
-    },
-  ])
-
-  const [customers] = useState<Customer[]>([
-    {
-      id: "1",
-      name: "John Doe",
-      email: "john@example.com",
-      phone: "(555) 123-4567",
-      totalBookings: 5,
-      lastBooking: "2025-01-15",
-    },
-    {
-      id: "2",
-      name: "Jane Smith",
-      email: "jane@example.com",
-      phone: "(555) 234-5678",
-      totalBookings: 3,
-      lastBooking: "2025-01-16",
-    },
-    {
-      id: "3",
-      name: "Bob Johnson",
-      email: "bob@example.com",
-      phone: "(555) 345-6789",
-      totalBookings: 8,
-      lastBooking: "2025-01-14",
-    },
-  ])
+  //customer
+ const [view, setView] = useState<{ open: boolean; customer: any }>({ open: false, customer: null })
+ 
+  const [bookings, setBookings] = useState(serverBookings)
+  const [customers, setCustomers] = useState(serverCustomers)
+  const [services, setServices] = useState(serverServices)
 
   const [staff] = useState<Staff[]>([
     {
@@ -207,48 +147,7 @@ export function AdminDashboard() {
     },
   ])
 
-  const [services] = useState<Service[]>([
-    {
-      id: "1",
-      name: "Deep Cleaning",
-      description: "Comprehensive deep cleaning service for homes and offices",
-      price: 150,
-      duration: "3-4 hours",
-      category: "Residential",
-    },
-    {
-      id: "2",
-      name: "Regular Cleaning",
-      description: "Standard cleaning service for regular maintenance",
-      price: 100,
-      duration: "2-3 hours",
-      category: "Residential",
-    },
-    {
-      id: "3",
-      name: "Office Cleaning",
-      description: "Professional office and commercial space cleaning",
-      price: 200,
-      duration: "4-5 hours",
-      category: "Commercial",
-    },
-    {
-      id: "4",
-      name: "Move In/Out Cleaning",
-      description: "Thorough cleaning for moving in or out",
-      price: 250,
-      duration: "5-6 hours",
-      category: "Residential",
-    },
-    {
-      id: "5",
-      name: "Carpet Cleaning",
-      description: "Professional carpet and upholstery cleaning",
-      price: 120,
-      duration: "2-3 hours",
-      category: "Specialty",
-    },
-  ])
+  
 
   const [leads] = useState<Lead[]>([
     {
@@ -340,36 +239,69 @@ export function AdminDashboard() {
     },
   ])
 
-  const handleLogout = () => {
-    logout()
-    router.push("/")
-  }
+  
 
-  const totalRevenue = bookings.reduce((sum, booking) => sum + booking.amount, 0)
-  const pendingBookings = bookings.filter((b) => b.status === "pending").length
-  const completedBookings = bookings.filter((b) => b.status === "completed").length
+  const totalRevenue = bookings.reduce(
+  (sum: number, b) =>
+    sum +
+    b.services.reduce(
+      (inner: number, s: { service: { price: number }; qty: number }) =>
+        inner + s.service.price * s.qty,
+      0
+    ),
+  0
+)
+//calculate other stats
+const pendingBookings = bookings.filter((b) => b.status === "PENDING").length
+const recentBookings = bookings.slice(0, 5) // last 5 bookings
+const completedBookings = bookings.filter((b) => b.status === "COMPLETED").length
 
-  const getStatusBadge = (status: Booking["status"]) => {
-    const variants = {
-      pending: "secondary",
-      confirmed: "default",
-      completed: "default",
-      cancelled: "secondary",
-    } as const
+//booking action handlers
+const confirmBookingLocal = async (id: number) => {
+  await confirmBooking(id)
+  setBookings(prev => prev.map(b => (b.id === id ? { ...b, status: "CONFIRMED" } : b)))
+  toast.success("Booking confirmed")
+}
 
-    const colors = {
-      pending: "bg-yellow-100 text-yellow-800 hover:bg-yellow-100",
-      confirmed: "bg-blue-100 text-blue-800 hover:bg-blue-100",
-      completed: "bg-green-100 text-green-800 hover:bg-green-100",
-      cancelled: "bg-red-100 text-red-800 hover:bg-red-100",
-    }
+const cancelBookingLocal = async (id: number) => {
+  await cancelBooking(id)
+  setBookings(prev =>
+    prev.map(b => (b.id === id ? { ...b, status: "CANCELLED" } : b))
+  )
+  toast.success("Booking cancelled")
+}
 
-    return (
-      <Badge variant={variants[status]} className={colors[status]}>
-        {status.charAt(0).toUpperCase() + status.slice(1)}
-      </Badge>
-    )
-  }
+const completeBookingLocal = async (id: number) => {
+  await completeBooking(id)
+  setBookings(prev =>
+    prev.map(b => (b.id === id ? { ...b, status: "COMPLETED" } : b))
+  )
+  toast.success("Booking completed")
+}
+
+ const getStatusBadge = (status: Booking["status"]) => {
+  const variants: Record<BookingStatus, "default" | "secondary"> = {
+  PENDING: "secondary",
+  CONFIRMED: "default",
+  COMPLETED: "default",
+  CANCELLED: "secondary",
+  IN_PROGRESS: "default",
+}
+
+const colors: Record<BookingStatus, string> = {
+  PENDING: "bg-yellow-100 text-yellow-800 hover:bg-yellow-100",
+  CONFIRMED: "bg-blue-100 text-blue-800 hover:bg-blue-100",
+  COMPLETED: "bg-green-100 text-green-800 hover:bg-green-100",
+  CANCELLED: "bg-red-100 text-red-800 hover:bg-red-100",
+  IN_PROGRESS: "bg-purple-100 text-purple-800 hover:bg-purple-100",
+}
+
+  return (
+    <Badge variant={variants[status]} className={colors[status]}>
+      {status.charAt(0).toUpperCase() + status.slice(1).toLowerCase()}
+    </Badge>
+  )
+}
 
   const getLeadStatusBadge = (status: Lead["status"]) => {
     const colors = {
@@ -422,7 +354,7 @@ export function AdminDashboard() {
             <h1 className="text-xl font-bold text-primary">PAT PRO CLEANING - Admin</h1>
             <div className="flex items-center gap-4">
               <span className="text-sm text-muted-foreground">Welcome, Sahr</span>
-              <Button variant="outline" size="sm" onClick={handleLogout}>
+              <Button variant="outline" size="sm" >
                 <LogOut className="h-4 w-4 mr-2" />
                 Logout
               </Button>
@@ -439,38 +371,38 @@ export function AdminDashboard() {
 
         {/* Stats Overview */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">${totalRevenue}</div>
-              <p className="text-xs text-muted-foreground">This month</p>
-            </CardContent>
-          </Card>
+         <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">${totalRevenue}</div>
+            <p className="text-xs text-muted-foreground">All time</p>
+          </CardContent>
+        </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Pending Bookings</CardTitle>
-              <Clock className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{pendingBookings}</div>
-              <p className="text-xs text-muted-foreground">Awaiting confirmation</p>
-            </CardContent>
-          </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Pending Bookings</CardTitle>
+            <Clock className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{pendingBookings}</div>
+            <p className="text-xs text-muted-foreground">Awaiting confirmation</p>
+          </CardContent>
+        </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Completed</CardTitle>
-              <CheckCircle className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{completedBookings}</div>
-              <p className="text-xs text-muted-foreground">This month</p>
-            </CardContent>
-          </Card>
+         <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Completed</CardTitle>
+            <CheckCircle className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{completedBookings}</div>
+            <p className="text-xs text-muted-foreground">All time</p>
+          </CardContent>
+        </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -547,24 +479,26 @@ export function AdminDashboard() {
               </div>
 
               <div className="grid gap-6 md:grid-cols-2">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Recent Bookings</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      {bookings.slice(0, 3).map((booking) => (
-                        <div key={booking.id} className="flex items-center justify-between border-b pb-3 last:border-0">
-                          <div>
-                            <p className="font-medium">{booking.customerName}</p>
-                            <p className="text-sm text-muted-foreground">{booking.service}</p>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Recent Bookings</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        {recentBookings.map((b) => (
+                          <div key={b.id} className="flex items-center justify-between border-b pb-3 last:border-0">
+                            <div>
+                              <p className="font-medium">{b.customer.name}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {b.services.map((s: { service: { name: string } }) => s.service.name).join(", ")}
+                              </p>
+                            </div>
+                            {getStatusBadge(b.status)}
                           </div>
-                          {getStatusBadge(booking.status)}
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
 
                 <Card>
                   <CardHeader>
@@ -665,50 +599,48 @@ export function AdminDashboard() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {bookings.map((booking) => (
-                      <TableRow key={booking.id}>
-                        <TableCell>
-                          <div>
-                            <p className="font-medium">{booking.customerName}</p>
-                            <p className="text-sm text-muted-foreground">{booking.customerEmail}</p>
-                          </div>
-                        </TableCell>
-                        <TableCell>{booking.service}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2 text-sm">
-                            <Calendar className="h-4 w-4" />
-                            {new Date(booking.date).toLocaleDateString()}
-                            <Clock className="h-4 w-4 ml-2" />
-                            {booking.time}
-                          </div>
-                        </TableCell>
-                        <TableCell className="max-w-[200px] truncate">{booking.address}</TableCell>
-                        <TableCell>${booking.amount}</TableCell>
-                        <TableCell>{getStatusBadge(booking.status)}</TableCell>
-                        <TableCell>
-                          <div className="flex gap-2">
-                            {booking.status === "pending" && (
-                              <>
-                                <Button size="sm" variant="outline">
-                                  <CheckCircle className="h-4 w-4 mr-1" />
-                                  Confirm
+                    {bookings.map((b) => {
+                      const serviceNames = b.services.map((s: any) => s.service.name).join(", ")
+                      return (
+                        <TableRow key={b.id}>
+                          <TableCell>
+                            <div>
+                              <p className="font-medium">{b.customer.name}</p>
+                              <p className="text-sm text-muted-foreground">{b.customer.email}</p>
+                            </div>
+                          </TableCell>
+                          <TableCell>{serviceNames}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2 text-sm">
+                              <Calendar className="h-4 w-4" />
+                              {new Date(b.bookingDate).toLocaleDateString()}
+                              <Clock className="h-4 w-4 ml-2" />
+                              {new Date(b.bookingDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </div>
+                          </TableCell>
+                          <TableCell>{b.customer.address || "-"}</TableCell>
+                          <TableCell>${b.services.reduce((sum: number, s:any) => sum + s.service.price * s.qty, 0)}</TableCell>
+                          <TableCell>{getStatusBadge(b.status)}</TableCell>
+                          <TableCell>
+                            {b.status === "PENDING" && (
+                              <div className="flex gap-2">
+                                <Button size="sm" variant="outline" onClick={() =>  confirmBookingLocal(b.id) }>
+                                  <CheckCircle className="h-4 w-4 mr-1" /> Confirm
                                 </Button>
-                                <Button size="sm" variant="outline">
-                                  <XCircle className="h-4 w-4 mr-1" />
-                                  Cancel
+                                <Button size="sm" variant="outline" onClick={ () =>  cancelBookingLocal(b.id)}>
+                                  <XCircle className="h-4 w-4 mr-1" /> Cancel
                                 </Button>
-                              </>
+                              </div>
                             )}
-                            {booking.status === "confirmed" && (
-                              <Button size="sm" variant="outline">
-                                <CheckCircle className="h-4 w-4 mr-1" />
-                                Complete
+                            {b.status === "CONFIRMED" && (
+                              <Button size="sm" variant="outline" onClick={ () => completeBookingLocal(b.id)}>
+                                <CheckCircle className="h-4 w-4 mr-1" /> Complete
                               </Button>
                             )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })} 
                   </TableBody>
                 </Table>
               </CardContent>
@@ -780,20 +712,33 @@ export function AdminDashboard() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {customers.map((customer) => (
-                      <TableRow key={customer.id}>
-                        <TableCell className="font-medium">{customer.name}</TableCell>
-                        <TableCell>{customer.email}</TableCell>
-                        <TableCell>{customer.phone}</TableCell>
-                        <TableCell>{customer.totalBookings}</TableCell>
-                        <TableCell>{new Date(customer.lastBooking).toLocaleDateString()}</TableCell>
-                        <TableCell>
-                          <Button size="sm" variant="outline">
-                            View Details
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {customers.map((c) => {
+                  const total = bookings.filter((b) => b.customerId === c.id).length
+                  const last = bookings
+                    .filter((b) => b.customerId === c.id)
+                    .sort((a, b) => new Date(b.bookingDate).getTime() - new Date(a.bookingDate).getTime())[0]
+
+                  return (
+                    <TableRow key={c.id}>
+                      <TableCell className="font-medium">{c.name}</TableCell>
+                      <TableCell>{c.email}</TableCell>
+                      <TableCell>{c.phone || "-"}</TableCell>
+                      <TableCell>{total}</TableCell>
+                      <TableCell>
+                        {last ? new Date(last.bookingDate).toLocaleDateString() : "-"}
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setView({ open: true, customer: c })}
+                        >
+                          View Details
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
                   </TableBody>
                 </Table>
               </CardContent>
@@ -883,9 +828,12 @@ export function AdminDashboard() {
                             <Button size="sm" variant="outline">
                               <Edit className="h-4 w-4" />
                             </Button>
-                            <Button size="sm" variant="outline">
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+
+                            
+                              <Button size="sm" variant="ghost" type="submit">
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            
                           </div>
                         </TableCell>
                       </TableRow>
@@ -904,7 +852,7 @@ export function AdminDashboard() {
                     <CardTitle>Service Management</CardTitle>
                     <CardDescription>Manage your cleaning services and pricing</CardDescription>
                   </div>
-                  <Dialog>
+                  <Dialog open={addOpen} onOpenChange={setAddOpen}>
                     <DialogTrigger asChild>
                       <Button>
                         <Plus className="h-4 w-4 mr-2" />
@@ -912,48 +860,106 @@ export function AdminDashboard() {
                       </Button>
                     </DialogTrigger>
                     <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Add New Service</DialogTitle>
-                        <DialogDescription>Create a new cleaning service offering</DialogDescription>
-                      </DialogHeader>
-                      <div className="space-y-4 py-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="service-name">Service Name</Label>
-                          <Input id="service-name" placeholder="Enter service name" />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="service-description">Description</Label>
-                          <Textarea id="service-description" placeholder="Enter service description" />
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
+                      <form
+                        action={async (fd) => {
+                          "use client"
+                          await createService({
+                            name: fd.get("name") as string,
+                            description: fd.get("description") as string,
+                            price: Number(fd.get("price")),
+                            durationMin: Number(fd.get("durationMin")),
+                          })
+                          setAddOpen(false)
+                          router.refresh()
+                        }}
+                      >
+                        <DialogHeader>
+                          <DialogTitle>Add New Service</DialogTitle>
+                          <DialogDescription>Create a new cleaning service offering</DialogDescription>
+                        </DialogHeader>
+
+                        <div className="space-y-4 py-4">
                           <div className="space-y-2">
-                            <Label htmlFor="service-price">Price ($)</Label>
-                            <Input id="service-price" type="number" placeholder="0" />
+                            <Label htmlFor="service-name">Service Name</Label>
+                            <Input name="name" id="service-name" placeholder="Enter service name" required />
                           </div>
                           <div className="space-y-2">
-                            <Label htmlFor="service-duration">Duration</Label>
-                            <Input id="service-duration" placeholder="e.g., 2-3 hours" />
+                            <Label htmlFor="service-description">Description</Label>
+                            <Textarea name="description" id="service-description" placeholder="Enter service description" />
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="service-price">Price ($)</Label>
+                              <Input name="price" id="service-price" type="number" placeholder="0" required />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="service-duration">Duration (minutes)</Label>
+                              <Input name="durationMin" id="service-duration" type="number" placeholder="120" required />
+                            </div>
                           </div>
                         </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="service-category">Category</Label>
-                          <Select>
-                            <SelectTrigger id="service-category">
-                              <SelectValue placeholder="Select category" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="residential">Residential</SelectItem>
-                              <SelectItem value="commercial">Commercial</SelectItem>
-                              <SelectItem value="specialty">Specialty</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-                      <DialogFooter>
-                        <Button type="submit">Add Service</Button>
-                      </DialogFooter>
+
+                        <DialogFooter>
+                          <Button type="submit">Add Service</Button>
+                        </DialogFooter>
+                      </form>
                     </DialogContent>
                   </Dialog>
+                  {/* editing dialog */}
+                  {/* ======  EDIT DIALOG  ====== */}
+                  <Dialog open={editOpen} onOpenChange={setEditOpen}>
+                    <DialogContent>
+                      <form
+                        action={async (fd) => {
+                          "use client"
+                          await updateService(editing.id, {
+                            name: fd.get("name") as string,
+                            description: fd.get("description") as string,
+                            price: Number(fd.get("price")),
+                            durationMin: Number(fd.get("durationMin")),
+                          })
+                          setEditOpen(false)
+                          setServices(prev =>
+                            prev.map(svc =>
+                              svc.id === editing.id
+                                ? { ...svc, name: fd.get("name"), description: fd.get("description"), price: Number(fd.get("price")), durationMin: Number(fd.get("durationMin")) }
+                                : svc
+                            )
+                          )
+                        }}
+                      >
+                        <DialogHeader>
+                          <DialogTitle>Edit Service</DialogTitle>
+                          <DialogDescription>Update service details</DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4 py-4">
+                          <div className="space-y-2">
+                            <Label>Service Name</Label>
+                            <Input name="name" defaultValue={editing?.name} required />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Description</Label>
+                            <Textarea name="description" defaultValue={editing?.description} />
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label>Price ($)</Label>
+                              <Input name="price" type="number" defaultValue={editing?.price} required />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Duration (minutes)</Label>
+                              <Input name="durationMin" type="number" defaultValue={editing?.durationMin} required />
+                            </div>
+                          </div>
+                        </div>
+                        <DialogFooter>
+                          <Button type="submit">Save Changes</Button>
+                        </DialogFooter>
+                      </form>
+                    </DialogContent>
+                  </Dialog>
+                  
+             
                 </div>
               </CardHeader>
               <CardContent>
@@ -969,12 +975,29 @@ export function AdminDashboard() {
                             </Badge>
                           </div>
                           <div className="flex gap-1">
-                            <Button size="sm" variant="ghost">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => {
+                                setEditing(service) // s is the current service in the map
+                                setEditOpen(true)
+                              }}
+                            >
                               <Edit className="h-4 w-4" />
                             </Button>
-                            <Button size="sm" variant="ghost">
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+
+
+                            <form
+                              action={async () => {
+                                "use client"
+                                await deleteService(service.id)
+                                router.refresh()
+                              }}
+                            >
+                              <Button size="sm" variant="ghost" type="submit">
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </form>
                           </div>
                         </div>
                       </CardHeader>
@@ -1181,11 +1204,11 @@ export function AdminDashboard() {
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="space-y-2">
                       <Label htmlFor="profile-name">Full Name</Label>
-                      <Input id="profile-name" defaultValue={user?.name} />
+                      <Input id="profile-name"  />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="profile-email">Email</Label>
-                      <Input id="profile-email" type="email" defaultValue={user?.email} />
+                      <Input id="profile-email" type="email"  />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="profile-phone">Phone</Label>
@@ -1319,6 +1342,25 @@ export function AdminDashboard() {
           </TabsContent>
         </Tabs>
       </div>
+      <Dialog open={view.open} onOpenChange={(open) => setView((v) => ({ ...v, open }))}>
+                  
+                    <DialogContent >
+                      <DialogHeader>
+                        <DialogTitle>Customer Details</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-2 py-4">
+                        <p><strong>Name:</strong> {view.customer?.name}</p>
+                        <p><strong>Email:</strong> {view.customer?.email}</p>
+                        <p><strong>Phone:</strong> {view.customer?.phone || "-"}</p>
+                        <p><strong>Address:</strong> {view.customer?.address || "-"}</p>
+                        <p><strong>Total Bookings:</strong> {bookings.filter((b) => b.customerId === view.customer?.id).length}</p>
+                        <p><strong>Member since:</strong> {view.customer?.createdAt ? new Date(view.customer.createdAt).toLocaleDateString() : "-"}</p>
+                      </div>
+                      <DialogFooter>
+                        <Button onClick={() => setView({ open: false, customer: null })}>Close</Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
     </div>
   )
 }

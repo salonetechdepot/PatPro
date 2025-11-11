@@ -1,27 +1,20 @@
-"use client"
+import { auth } from "@clerk/nextjs/server"
+import { redirect } from "next/navigation"
+import { prisma } from "../../lib/prisma"
+import { AdminDashboard } from "../../components/admin-dashboard"
 
-import { useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { useAuth } from "@/lib/auth-context"
-import { AdminDashboard } from "@/components/admin-dashboard"
+export default async function AdminPage() {
+  const session = await auth()
+  if (!session?.userId) redirect("/sign-in")
 
-export default function AdminPage() {
-  const { user, isLoading } = useAuth()
-  const router = useRouter()
+  const [services, customers, bookings] = await Promise.all([
+  prisma.service.findMany({ orderBy: { id: "asc" } }),
+  prisma.customer.findMany({ orderBy: { id: "asc" } }),
+  prisma.booking.findMany({
+    include: { customer: true, services: { include: { service: true } } },
+    orderBy: { bookingDate: "desc" },
+  }),
+])
 
-  useEffect(() => {
-    if (!isLoading && (!user || user.role !== "admin")) {
-      router.push("/login")
-    }
-  }, [user, isLoading, router])
-
-  if (isLoading || !user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p>Loading...</p>
-      </div>
-    )
-  }
-
-  return <AdminDashboard />
+  return <AdminDashboard serverServices={services} serverCustomers={customers} serverBookings={bookings} />
 }

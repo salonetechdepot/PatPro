@@ -1,12 +1,6 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
+// prisma/schema.prisma
 generator client {
-  provider = "prisma-client"
-  output   = "../lib/generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
@@ -14,16 +8,51 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Booking {
-  id          String   @id @default(cuid())
-  customerId  String   // Clerk userId
-  service     String
-  date        DateTime // stored as full timestamp
-  timeSlot    String   // "10:00 AM" etc.
-  status      String   @default("upcoming") // upcoming | completed | cancelled
-  address     String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+model Customer {
+  id        Int       @id @default(autoincrement())
+  email     String    @unique
+  name      String
+  phone     String?
+  address   String?
+  clerkId   String?   @unique   // ← new
+  bookings  Booking[]
+  createdAt DateTime  @default(now())
+}
 
-  @@index([customerId])
+model Service {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  price       Float
+  durationMin Int      // estimated minutes
+  bookings    BookingService[]
+}
+
+model Booking {
+  id           Int              @id @default(autoincrement())
+  customerId   Int
+  customer     Customer         @relation(fields: [customerId], references: [id])
+  bookingDate  DateTime
+  status       BookingStatus    @default(PENDING)
+  totalPrice   Float?
+  notes        String?
+  createdAt    DateTime         @default(now())
+  services     BookingService[]
+}
+
+model BookingService {
+  id         Int      @id @default(autoincrement())
+  bookingId  Int
+  booking    Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  serviceId  Int
+  service    Service  @relation(fields: [serviceId], references: [id])
+  qty        Int      @default(1)
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
 }

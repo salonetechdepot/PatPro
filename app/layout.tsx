@@ -3,6 +3,7 @@ import { GeistSans } from "geist/font/sans"
 import { GeistMono } from "geist/font/mono"
 import { Analytics } from "@vercel/analytics/next"
 import { ClerkProvider } from "@clerk/nextjs"
+import { Toaster } from "sonner"
 import "./globals.css"
 
 export const metadata: Metadata = {
@@ -27,6 +28,7 @@ export default function RootLayout({
         <body
           className={`${GeistSans.variable} ${GeistMono.variable} font-sans antialiased`}
         >
+          <Toaster position="top-right" />
           {children}
           <Analytics />
         </body>
