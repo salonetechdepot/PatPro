@@ -10,7 +10,10 @@ export async function createService(data: {
   description: string
   price: number
   durationMin: number
+  category?: string
+  imageUrl?: string
 }) {
+  "use server"
   await prisma.service.create({ data })
   revalidatePath("/admin")
 }
@@ -28,6 +31,8 @@ export async function updateService(
     description: string
     price: number
     durationMin: number
+    category?: string
+    imageUrl?: string
   }
 ) {
   "use server"
@@ -134,3 +139,31 @@ export async function completeBooking(id: number) {
   revalidatePath("/admin")
 }
 
+//costumer dashboard action
+export async function rescheduleBooking(id: number, newDate: Date) {
+  "use server"
+  await prisma.booking.update({ where: { id }, data: { bookingDate: newDate } })
+  revalidatePath("/account")
+}
+
+export async function updateCustomerProfile(
+  clerkId: string,
+  data: { name?: string; phone?: string; address?: string }
+) {
+  "use server"
+  await prisma.customer.update({ where: { clerkId }, data })
+  revalidatePath("/account")
+}
+
+export async function bookAgain(customerId: number, serviceIds: number[]) {
+  "use server"
+  await prisma.booking.create({
+    data: {
+      customerId,
+      bookingDate: new Date(Date.now() + 24 * 60 * 60 * 1000), // tomorrow 9 am
+      status: "PENDING",
+      services: { create: serviceIds.map((id) => ({ serviceId: id, qty: 1 })) },
+    },
+  })
+  revalidatePath("/account")
+}

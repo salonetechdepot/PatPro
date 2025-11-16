@@ -34,7 +34,7 @@ export async function Services() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
           {services.map((service) => {
             const Icon = iconMap[service.name] ?? Sparkles
-            const img = imageMap[service.name] ?? "/placeholder.svg"
+            const img = service.imageUrl || imageMap[service.name] || "/placeholder.svg"
             return (
               <Card key={service.id} className="border-border hover:shadow-lg transition-shadow overflow-hidden">
                 <div className="aspect-video overflow-hidden">

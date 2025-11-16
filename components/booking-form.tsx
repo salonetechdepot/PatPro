@@ -3,8 +3,11 @@
 import { useState } from "react"
 import { useUser } from "@clerk/nextjs"
 import { createBooking } from "../lib/server-actions"
+import { toast } from "sonner"
 
-export function BookingForm({ services }: { services: any[] }) {
+type Props = { services: any[]; onSuccess?: () => void }
+
+export function BookingForm({ services, onSuccess }: Props) {
   const { user, isLoaded } = useUser()
   const [selected, setSelected] = useState<number[]>([])
   const [date, setDate] = useState("")
@@ -28,7 +31,8 @@ export function BookingForm({ services }: { services: any[] }) {
       phone: user.primaryPhoneNumber?.phoneNumber || undefined,
     })
     setLoading(false)
-    alert("Booking submitted!")
+    onSuccess?.()
+    toast.success("Booking created successfully!")
   }
 
   return (

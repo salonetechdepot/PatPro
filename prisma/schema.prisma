@@ -24,7 +24,9 @@ model Service {
   name        String
   description String?
   price       Float
-  durationMin Int      // estimated minutes
+  durationMin Int
+  category    String   @default("Residential")
+  imageUrl    String?
   bookings    BookingService[]
 }
 

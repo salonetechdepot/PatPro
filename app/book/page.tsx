@@ -1,12 +1,13 @@
+import { Metadata } from "next"
 import { prisma } from "../../lib/prisma"
-import { BookingForm } from "../../components/booking-form"
+import { BookingCTA } from "../../components/booking-cta"
+
+export const metadata: Metadata = {
+  title: "Book a Cleaning – Pat Pro",
+  description: "Schedule professional cleaning in 60 seconds.",
+}
 
 export default async function BookPage() {
   const services = await prisma.service.findMany({ orderBy: { id: "asc" } })
-  return (
-    <main className="p-8 max-w-2xl mx-auto">
-      <h1 className="text-2xl font-bold mb-6">Book a Cleaning</h1>
-      <BookingForm services={services} />
-    </main>
-  )
+  return <BookingCTA services={services} />
 }

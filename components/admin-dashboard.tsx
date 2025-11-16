@@ -3,6 +3,8 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import type { Booking , BookingStatus} from "@prisma/client"
+
+import { uploadToCloudinary } from "../lib/cloudinary-client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -116,6 +118,8 @@ export function AdminDashboard({
   const [bookings, setBookings] = useState(serverBookings)
   const [customers, setCustomers] = useState(serverCustomers)
   const [services, setServices] = useState(serverServices)
+
+  const [filePreview, setFilePreview] = useState<string | null>(null)
 
   const [staff] = useState<Staff[]>([
     {
@@ -277,6 +281,13 @@ const completeBookingLocal = async (id: number) => {
     prev.map(b => (b.id === id ? { ...b, status: "COMPLETED" } : b))
   )
   toast.success("Booking completed")
+}
+
+//services
+const handleDelete = async (id: number) => {
+  await deleteService(id)
+  setServices(prev => prev.filter(s => s.id !== id))
+  toast.success("Service deleted")
 }
 
  const getStatusBadge = (status: Booking["status"]) => {
@@ -862,16 +873,27 @@ const colors: Record<BookingStatus, string> = {
                     <DialogContent>
                       <form
                         action={async (fd) => {
-                          "use client"
-                          await createService({
-                            name: fd.get("name") as string,
-                            description: fd.get("description") as string,
-                            price: Number(fd.get("price")),
-                            durationMin: Number(fd.get("durationMin")),
-                          })
-                          setAddOpen(false)
-                          router.refresh()
-                        }}
+                        "use client"
+                        const file = fd.get("image") as File
+                        let imageUrl: string | undefined
+                        if (file && file.size > 0) {
+                          const bytes = await file.arrayBuffer()
+                          const base64 = Buffer.from(bytes).toString("base64")
+                          const dataUri = `data:${file.type};base64,${base64}`
+                          imageUrl = await uploadToCloudinary(file) 
+                        }
+
+                        await createService({
+                          name: fd.get("name") as string,
+                          description: fd.get("description") as string,
+                          price: Number(fd.get("price")),
+                          durationMin: Number(fd.get("durationMin")),
+                          category: fd.get("category") as string,
+                          imageUrl,
+                        })
+                        setAddOpen(false)
+                        setServices(prev => [...prev, { /* optimistic stub */ }])
+                      }}
                       >
                         <DialogHeader>
                           <DialogTitle>Add New Service</DialogTitle>
@@ -898,6 +920,34 @@ const colors: Record<BookingStatus, string> = {
                             </div>
                           </div>
                         </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="service-category">Category</Label>
+                          <Select name="category" defaultValue="Residential">
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Residential">Residential</SelectItem>
+                              <SelectItem value="Commercial">Commercial</SelectItem>
+                              <SelectItem value="Specialty">Specialty</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label>Image</Label>
+                          <input
+                            name="image"
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => {
+                              const f = e.target.files?.[0]
+                              if (f) setFilePreview(URL.createObjectURL(f))
+                              else setFilePreview(null)
+                            }}
+                          />
+                          {filePreview && (
+                            <img src={filePreview} alt="Preview" className="w-32 h-20 object-cover rounded border" />
+                          )}
+                        </div>
 
                         <DialogFooter>
                           <Button type="submit">Add Service</Button>
@@ -910,23 +960,45 @@ const colors: Record<BookingStatus, string> = {
                   <Dialog open={editOpen} onOpenChange={setEditOpen}>
                     <DialogContent>
                       <form
-                        action={async (fd) => {
-                          "use client"
-                          await updateService(editing.id, {
-                            name: fd.get("name") as string,
-                            description: fd.get("description") as string,
-                            price: Number(fd.get("price")),
-                            durationMin: Number(fd.get("durationMin")),
-                          })
-                          setEditOpen(false)
-                          setServices(prev =>
-                            prev.map(svc =>
-                              svc.id === editing.id
-                                ? { ...svc, name: fd.get("name"), description: fd.get("description"), price: Number(fd.get("price")), durationMin: Number(fd.get("durationMin")) }
-                                : svc
-                            )
+                       action={async (fd) => {
+                        "use client"
+                        const file = fd.get("image") as File
+                        const currentImage = fd.get("currentImage") as string
+                        let imageUrl: string | undefined = currentImage || undefined
+                        if (file && file.size > 0) {
+                          const bytes = await file.arrayBuffer()
+                          const base64 = Buffer.from(bytes).toString("base64")
+                          const dataUri = `data:${file.type};base64,${base64}`
+                          imageUrl = await uploadToCloudinary(file)
+                        }
+                          console.log("uploaded URL", imageUrl)
+                          
+                        await updateService(editing.id, {
+                          name: fd.get("name") as string,
+                          description: fd.get("description") as string,
+                          price: Number(fd.get("price")),
+                          durationMin: Number(fd.get("durationMin")),
+                          category: fd.get("category") as string,
+                          imageUrl,
+                        })
+
+                        setEditOpen(false)
+                        setServices(prev =>
+                          prev.map(svc =>
+                            svc.id === editing.id
+                              ? {
+                                  ...svc,
+                                  name: fd.get("name") as string,
+                                  description: fd.get("description") as string,
+                                  price: Number(fd.get("price")),
+                                  durationMin: Number(fd.get("durationMin")),
+                                  category: fd.get("category") as string,
+                                  imageUrl,
+                                }
+                              : svc
                           )
-                        }}
+                        )
+                      }}
                       >
                         <DialogHeader>
                           <DialogTitle>Edit Service</DialogTitle>
@@ -950,6 +1022,33 @@ const colors: Record<BookingStatus, string> = {
                               <Label>Duration (minutes)</Label>
                               <Input name="durationMin" type="number" defaultValue={editing?.durationMin} required />
                             </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="service-category">Category</Label>
+                              <Select name="category" defaultValue={editing?.category || "Residential"}>
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="Residential">Residential</SelectItem>
+                                  <SelectItem value="Commercial">Commercial</SelectItem>
+                                  <SelectItem value="Specialty">Specialty</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-2">
+                            <Label>Image</Label>
+                            <input
+                              name="image"
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) => {
+                                const f = e.target.files?.[0]
+                                if (f) setFilePreview(URL.createObjectURL(f))
+                                else setFilePreview(null)
+                              }}
+                            />
+                            {filePreview && (
+                              <img src={filePreview} alt="Preview" className="w-32 h-20 object-cover rounded border" />
+                            )}
+                          </div>
                           </div>
                         </div>
                         <DialogFooter>
@@ -965,56 +1064,54 @@ const colors: Record<BookingStatus, string> = {
               <CardContent>
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                   {services.map((service) => (
-                    <Card key={service.id}>
-                      <CardHeader>
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <CardTitle className="text-lg">{service.name}</CardTitle>
-                            <Badge variant="secondary" className="mt-2">
-                              {service.category}
-                            </Badge>
-                          </div>
-                          <div className="flex gap-1">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => {
-                                setEditing(service) // s is the current service in the map
-                                setEditOpen(true)
-                              }}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-
-
-                            <form
-                              action={async () => {
-                                "use client"
-                                await deleteService(service.id)
-                                router.refresh()
-                              }}
-                            >
-                              <Button size="sm" variant="ghost" type="submit">
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </form>
-                          </div>
+                  <Card key={service.id} className="border-border hover:shadow-lg transition-shadow overflow-hidden">
+                    {service.imageUrl && (
+                      <img
+                        src={service.imageUrl}
+                        alt={service.name}
+                        className="w-full h-32 object-cover rounded-t"
+                        onError={(e) => (e.currentTarget.src = "/placeholder.svg")}
+                      />
+                    )}
+                    <CardHeader>
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <CardTitle className="text-lg">{service.name}</CardTitle>
+                          <Badge variant="secondary" className="mt-2">
+                            {service.category}
+                          </Badge>
                         </div>
-                      </CardHeader>
-                      <CardContent>
-                        <p className="text-sm text-muted-foreground mb-4">{service.description}</p>
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-muted-foreground">Price:</span>
-                            <span className="font-semibold">${service.price}</span>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-muted-foreground">Duration:</span>
-                            <span className="text-sm">{service.duration}</span>
-                          </div>
+                        <div className="flex gap-1">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              setEditing(service)
+                              setEditOpen(true)
+                            }}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={async () => await handleDelete(service.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
-                      </CardContent>
-                    </Card>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm text-muted-foreground mb-4">{service.description}</p>
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">Price:</span>
+                          <span className="font-semibold">${service.price}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">Duration:</span>
+                          <span className="text-sm">{service.durationMin} min</span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
                   ))}
                 </div>
               </CardContent>

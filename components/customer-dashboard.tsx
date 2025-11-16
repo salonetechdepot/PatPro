@@ -1,61 +1,63 @@
 "use client"
-
 import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useUser } from "@clerk/nextjs"
+import { BookingForm } from "../components/booking-form"
+import { toast } from "sonner"
+import { Calendar, Clock, Home, Plus, User, LogOut } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Calendar, Clock, Home, LogOut, Plus, User } from "lucide-react"
-import { BookingForm } from "@/components/booking-form"
+import { Card, CardHeader, CardContent, CardDescription, CardTitle } from "@/components/ui/card"
+import { useClerk } from "@clerk/nextjs"
+import { cancelBooking } from "../lib/server-actions"
+import { rescheduleBooking } from "../lib/server-actions"
+import { updateCustomerProfile } from "../lib/server-actions"
+import { bookAgain } from "../lib/server-actions"
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
+import { useRouter } from "next/navigation"
 
-type Booking = {
-  id: string
-  service: string
-  date: string
-  time: string
-  status: "upcoming" | "completed" | "cancelled"
-  address: string
+
+type Props = {
+  serverBookings: any[]
+  customer: { id: number; name: string; email: string; phone?: string; address?: string }
 }
 
-export function CustomerDashboard() {
- 
-  const router = useRouter()
+export function CustomerDashboard({ serverBookings, customer }: Props) {
+  const { signOut } = useClerk() 
+  const { user } = useUser()
+    const router = useRouter()
+  const [bookings] = useState(serverBookings) // local state for future edits
   const [showBookingForm, setShowBookingForm] = useState(false)
 
-  // Mock bookings data
-  const [bookings] = useState<Booking[]>([
-    {
-      id: "1",
-      service: "Deep Cleaning",
-      date: "2025-01-15",
-      time: "10:00 AM",
-      status: "upcoming",
-      address: "123 Main St, City",
-    },
-    {
-      id: "2",
-      service: "Regular Cleaning",
-      date: "2025-01-08",
-      time: "2:00 PM",
-      status: "completed",
-      address: "123 Main St, City",
-    },
-  ])
+  const [rescheduleOpen, setRescheduleOpen] = useState(false)
+  const [rescheduling, setRescheduling] = useState<any>(null)
+
+  const [editingProfile, setEditingProfile] = useState(false)
+  const [profileForm, setProfileForm] = useState({
+    name: customer.name,
+    phone: customer.phone || "",
+    address: customer.address || "",
+  })
+
+  const upcoming = bookings.filter((b) => b.status === "PENDING")
+  const past = bookings.filter((b) => b.status === "COMPLETED" || b.status === "CANCELLED")
+
+  if (!user) return <p>Please sign in.</p>
 
 
-  const upcomingBookings = bookings.filter((b) => b.status === "upcoming")
-  const pastBookings = bookings.filter((b) => b.status === "completed")
 
   return (
+    // your existing JSX stays identical—just replace hard-coded data with:
+    // customer.name, customer.email, bookings.length, upcoming.length, etc.
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white">
-      {/* Header */}
       <header className="bg-white border-b border-border">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <h1 className="text-xl font-bold text-primary">PAT PRO CLEANING</h1>
             <div className="flex items-center gap-4">
-              <span className="text-sm text-muted-foreground">Welcome, Sahr</span>
-              <Button variant="outline" size="sm" >
+              <span className="text-sm text-muted-foreground">Welcome, {customer.name}</span>
+              <Button variant="outline" size="sm" onClick={() => signOut(() => router.push("/"))}>
                 <LogOut className="h-4 w-4 mr-2" />
                 Logout
               </Button>
@@ -78,24 +80,24 @@ export function CustomerDashboard() {
           </TabsList>
 
           <TabsContent value="bookings" className="space-y-6">
-            {/* Quick Stats */}
+            {/* live stats */}
             <div className="grid gap-4 md:grid-cols-3">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Upcoming</CardTitle>
+                  <CardTitle className="text-sm font-medium">Upcoming Cleanings</CardTitle>
                   <Calendar className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{upcomingBookings.length}</div>
+                  <div className="text-2xl font-bold">{upcoming.length}</div>
                 </CardContent>
               </Card>
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Completed</CardTitle>
+                  <CardTitle className="text-sm font-medium">Past Bookings</CardTitle>
                   <Clock className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{pastBookings.length}</div>
+                  <div className="text-2xl font-bold">{past.length}</div>
                 </CardContent>
               </Card>
               <Card>
@@ -109,33 +111,33 @@ export function CustomerDashboard() {
               </Card>
             </div>
 
-            {/* Upcoming Bookings */}
+            {/* upcoming bookings */}
             <div>
               <h3 className="text-xl font-semibold mb-4">Upcoming Bookings</h3>
-              {upcomingBookings.length > 0 ? (
+              {upcoming.length > 0 ? (
                 <div className="grid gap-4">
-                  {upcomingBookings.map((booking) => (
-                    <Card key={booking.id}>
+                  {upcoming.map((b) => (
+                    <Card key={b.id}>
                       <CardHeader>
-                        <CardTitle>{booking.service}</CardTitle>
-                        <CardDescription>{booking.address}</CardDescription>
+                        <CardTitle>{b.services.map((s: any) => s.service.name).join(", ")}</CardTitle>
+                        <CardDescription>{b.address || customer.address}</CardDescription>
                       </CardHeader>
                       <CardContent>
                         <div className="flex items-center gap-4 text-sm text-muted-foreground">
                           <div className="flex items-center gap-2">
                             <Calendar className="h-4 w-4" />
-                            {new Date(booking.date).toLocaleDateString()}
+                            {new Date(b.bookingDate).toLocaleDateString()}
                           </div>
                           <div className="flex items-center gap-2">
                             <Clock className="h-4 w-4" />
-                            {booking.time}
+                            {new Date(b.bookingDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </div>
                         </div>
                         <div className="mt-4 flex gap-2">
-                          <Button variant="outline" size="sm">
+                          <Button variant="outline" size="sm" onClick={() => { setRescheduling(b); setRescheduleOpen(true) }}>
                             Reschedule
                           </Button>
-                          <Button variant="outline" size="sm">
+                          <Button variant="outline" size="sm" onClick={async () => { await cancelBooking(b.id); toast.success("Booking cancelled"); router.refresh(); }}>
                             Cancel
                           </Button>
                         </div>
@@ -156,31 +158,41 @@ export function CustomerDashboard() {
               )}
             </div>
 
-            {/* Past Bookings */}
+            {/* past bookings */}
             <div>
               <h3 className="text-xl font-semibold mb-4">Past Bookings</h3>
-              {pastBookings.length > 0 ? (
+              {past.length > 0 ? (
                 <div className="grid gap-4">
-                  {pastBookings.map((booking) => (
-                    <Card key={booking.id}>
+                  {past.map((b) => (
+                    <Card key={b.id}>
                       <CardHeader>
-                        <CardTitle>{booking.service}</CardTitle>
-                        <CardDescription>{booking.address}</CardDescription>
+                        <CardTitle>{b.services.map((s: any) => s.service.name).join(", ")}</CardTitle>
+                        <CardDescription>{b.address || customer.address}</CardDescription>
                       </CardHeader>
                       <CardContent>
                         <div className="flex items-center gap-4 text-sm text-muted-foreground">
                           <div className="flex items-center gap-2">
                             <Calendar className="h-4 w-4" />
-                            {new Date(booking.date).toLocaleDateString()}
+                            {new Date(b.bookingDate).toLocaleDateString()}
                           </div>
                           <div className="flex items-center gap-2">
                             <Clock className="h-4 w-4" />
-                            {booking.time}
+                            {new Date(b.bookingDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </div>
                         </div>
-                        <Button variant="outline" size="sm" className="mt-4 bg-transparent">
-                          Book Again
-                        </Button>
+                        <Button
+                        variant="outline"
+                        size="sm"
+                        className="mt-4 bg-transparent"
+                        onClick={async () => {
+                          const ids = b.services.map((s: any) => s.service.id)
+                          await bookAgain(customer.id, ids)
+                          toast.success("New booking created for tomorrow 9 AM")
+                          router.push("/account?tab=bookings")
+                        }}
+                      >
+                        Book Again
+                      </Button>
                       </CardContent>
                     </Card>
                   ))}
@@ -196,7 +208,7 @@ export function CustomerDashboard() {
           </TabsContent>
 
           <TabsContent value="new">
-            <BookingForm />
+           <BookingForm services={bookings.length > 0 ? bookings[0].services.map((s: any) => s.service) : []} />
           </TabsContent>
 
           <TabsContent value="profile">
@@ -206,21 +218,84 @@ export function CustomerDashboard() {
                 <CardDescription>Manage your account details</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex items-center gap-4">
-                  <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
-                    <User className="h-8 w-8 text-primary" />
-                  </div>
-                  <div>
-                    <p className="font-semibold">Sahr</p>
-                    <p className="text-sm text-muted-foreground">sahr@example.com</p>
-                  </div>
+              <div className="flex items-center gap-4">
+                <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
+                  <User className="h-8 w-8 text-primary" />
                 </div>
-                <Button variant="outline">Edit Profile</Button>
-              </CardContent>
+                {editingProfile ? (
+                  <form
+                    className="space-y-4"
+                    onSubmit={async (e) => {
+                      e.preventDefault()
+                      await updateCustomerProfile(user.id, profileForm)
+                      toast.success("Profile updated")
+                      setEditingProfile(false)
+                    }}
+                  >
+                    <Label>Name</Label>
+                    <Input
+                      value={profileForm.name}
+                      onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
+                    />
+                    <Label>Phone</Label>
+                    <Input
+                      value={profileForm.phone}
+                      onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
+                    />
+                    <Label>Address</Label>
+                    <Input
+                      value={profileForm.address}
+                      onChange={(e) => setProfileForm({ ...profileForm, address: e.target.value })}
+                    />
+                    <div className="flex gap-2">
+                      <Button type="submit">Save</Button>
+                      <Button type="button" variant="outline" onClick={() => setEditingProfile(false)}>
+                        Cancel
+                      </Button>
+                    </div>
+                  </form>
+                ) : (
+                  <div>
+                    <p className="font-semibold">{customer.name}</p>
+                    <p className="text-sm text-muted-foreground">{customer.email}</p>
+                    {customer.phone && <p className="text-sm text-muted-foreground">{customer.phone}</p>}
+                    {customer.address && <p className="text-sm text-muted-foreground">{customer.address}</p>}
+                    <Button variant="outline" className="mt-4" onClick={() => setEditingProfile(true)}>
+                      Edit Profile
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </CardContent>
             </Card>
           </TabsContent>
         </Tabs>
       </div>
+      <Dialog open={rescheduleOpen} onOpenChange={setRescheduleOpen}>
+  <DialogContent>
+    <form
+      action={async (fd) => {
+        "use client"
+        const newDate = fd.get("newDate") as string
+        await rescheduleBooking(rescheduling.id, new Date(newDate))
+        setRescheduleOpen(false)
+        toast.success("Booking rescheduled")
+        router.refresh()
+      }}
+    >
+      <DialogHeader>
+        <DialogTitle>Reschedule Booking</DialogTitle>
+      </DialogHeader>
+      <div className="space-y-4 py-4">
+        <Label>New Date & Time</Label>
+        <Input name="newDate" type="datetime-local" required />
+      </div>
+      <DialogFooter>
+        <Button type="submit">Save</Button>
+      </DialogFooter>
+    </form>
+  </DialogContent>
+</Dialog>
     </div>
   )
 }
