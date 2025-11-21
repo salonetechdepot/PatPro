@@ -38,8 +38,11 @@ model Booking {
   status       BookingStatus    @default(PENDING)
   totalPrice   Float?
   notes        String?
+  photos String[] // array of URLs
   createdAt    DateTime         @default(now())
   services     BookingService[]
+  assignedStaffId Int?
+  assignedStaff   Staff? @relation(fields: [assignedStaffId], references: [id])
 }
 
 model BookingService {
@@ -57,4 +60,17 @@ enum BookingStatus {
   IN_PROGRESS
   COMPLETED
   CANCELLED
+}
+
+model Staff {
+  id            Int      @id @default(autoincrement())
+  clerkId       String   @unique
+  name          String
+  email         String   @unique
+  phone         String?
+  role          String   @default("cleaner") // cleaner | supervisor
+  status        String   @default("active")   // active | inactive
+  photoUrl      String?
+  assignedJobs  Booking[]
+  createdAt     DateTime @default(now())
 }

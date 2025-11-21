@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import type { Booking , BookingStatus} from "@prisma/client"
+import { inviteStaff } from "@/lib/staff-actions"
 
 import { uploadToCloudinary } from "../lib/cloudinary-client"
 import { Button } from "@/components/ui/button"
@@ -51,6 +52,7 @@ type Props = {
   serverServices: any[] 
   serverCustomers: any[]
   serverBookings?: any[]
+  serverStaff?: any[]
 }
 
 
@@ -104,6 +106,7 @@ export function AdminDashboard({
   serverServices = [],
   serverCustomers = [],
   serverBookings = [],
+  serverStaff = [],
 }: Props) {
 
   const router = useRouter()
@@ -119,37 +122,12 @@ export function AdminDashboard({
   const [customers, setCustomers] = useState(serverCustomers)
   const [services, setServices] = useState(serverServices)
 
+  const [addStaffOpen, setAddStaffOpen] = useState(false)
+  const [staffForm, setStaffForm] = useState({ name: "", email: "", phone: "", role: "cleaner" })
+
   const [filePreview, setFilePreview] = useState<string | null>(null)
 
-  const [staff] = useState<Staff[]>([
-    {
-      id: "1",
-      name: "Sarah Johnson",
-      email: "sarah@patpro.com",
-      phone: "(555) 111-2222",
-      role: "Senior Cleaner",
-      status: "active",
-      assignedJobs: 12,
-    },
-    {
-      id: "2",
-      name: "Mike Davis",
-      email: "mike@patpro.com",
-      phone: "(555) 222-3333",
-      role: "Cleaner",
-      status: "active",
-      assignedJobs: 8,
-    },
-    {
-      id: "3",
-      name: "Emily Brown",
-      email: "emily@patpro.com",
-      phone: "(555) 333-4444",
-      role: "Supervisor",
-      status: "active",
-      assignedJobs: 15,
-    },
-  ])
+  
 
   
 
@@ -824,33 +802,61 @@ const colors: Record<BookingStatus, string> = {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {staff.map((member) => (
-                      <TableRow key={member.id}>
-                        <TableCell className="font-medium">{member.name}</TableCell>
-                        <TableCell>{member.email}</TableCell>
-                        <TableCell>{member.phone}</TableCell>
-                        <TableCell>{member.role}</TableCell>
-                        <TableCell>{member.assignedJobs}</TableCell>
-                        <TableCell>
-                          <Badge variant={member.status === "active" ? "default" : "secondary"}>{member.status}</Badge>
+                    {serverStaff.map((s) => (
+                    <TableRow key={s.id}>
+                      <TableCell>{s.name}</TableCell>
+                      <TableCell>{s.email}</TableCell>
+                      <TableCell>{s.role}</TableCell>
+                      <TableCell>
+                         <Badge variant={s.status === "active" ? "default" : "secondary"}>
+                          {s.status}
+                        </Badge>
                         </TableCell>
-                        <TableCell>
-                          <div className="flex gap-2">
-                            <Button size="sm" variant="outline">
-                              <Edit className="h-4 w-4" />
-                            </Button>
-
-                            
-                              <Button size="sm" variant="ghost" type="submit">
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                      <TableCell>{new Date(s.createdAt).toLocaleDateString()}</TableCell>
+                    </TableRow>
+                  ))}
                   </TableBody>
                 </Table>
+                <Dialog open={addStaffOpen} onOpenChange={setAddStaffOpen}>
+                  <DialogTrigger asChild>
+                    <Button><Plus className="h-4 w-4 mr-2" />Add Staff</Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <form
+                      onSubmit={async (e) => {
+                        e.preventDefault()
+                        await inviteStaff(staffForm)
+                        setAddStaffOpen(false)
+                        toast.success("Invitation sent")
+                      }}
+                    >
+                      <DialogHeader>
+                        <DialogTitle>Add New Staff</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4 py-4">
+                        <Label>Name</Label>
+                        <Input value={staffForm.name} onChange={(e) => setStaffForm({ ...staffForm, name: e.target.value })} required />
+                        <Label>Email</Label>
+                        <Input type="email" value={staffForm.email} onChange={(e) => setStaffForm({ ...staffForm, email: e.target.value })} required />
+                        <Label>Phone</Label>
+                        <Input value={staffForm.phone} onChange={(e) => setStaffForm({ ...staffForm, phone: e.target.value })} />
+                        <Label>Role</Label>
+                        <Select value={staffForm.role} onValueChange={(v) => setStaffForm({ ...staffForm, role: v })}>
+  <SelectTrigger>
+    <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="cleaner">Cleaner</SelectItem>
+                          <SelectItem value="supervisor">Supervisor</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      </div>
+                      <DialogFooter>
+                        <Button type="submit">Send Invitation</Button>
+                      </DialogFooter>
+                    </form>
+                  </DialogContent>
+                </Dialog>
               </CardContent>
             </Card>
           </TabsContent>

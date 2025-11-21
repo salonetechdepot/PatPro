@@ -3,11 +3,12 @@
 import { useState } from "react"
 import { useUser } from "@clerk/nextjs"
 import { createBooking } from "../lib/server-actions"
+import { sendCustomerConfirmation } from "../lib/mailer"
 import { toast } from "sonner"
 
-type Props = { services: any[]; onSuccess?: () => void }
+type Props = { services: any[]; onSuccess?: () => void; customer?: any}
 
-export function BookingForm({ services, onSuccess }: Props) {
+export function BookingForm({ services, onSuccess, customer }: Props) {
   const { user, isLoaded } = useUser()
   const [selected, setSelected] = useState<number[]>([])
   const [date, setDate] = useState("")
@@ -20,7 +21,7 @@ export function BookingForm({ services, onSuccess }: Props) {
 
   async function handleSubmit(fd: FormData) {
     setLoading(true)
-    await createBooking({
+    const booking = await createBooking({
       serviceIds: selected,
       bookingDate: new Date(date),
       address,
@@ -29,7 +30,17 @@ export function BookingForm({ services, onSuccess }: Props) {
       email: user.primaryEmailAddress?.emailAddress || "",
       name: user.fullName || "",
       phone: user.primaryPhoneNumber?.phoneNumber || undefined,
-    })
+      
+    }
+    
+  )
+    await sendCustomerConfirmation(
+      customer.email,
+      customer.name,
+      booking.id,
+      booking.services.map((s) => s.service.name).join(", "),
+      booking.bookingDate.toISOString()
+    )
     setLoading(false)
     onSuccess?.()
     toast.success("Booking created successfully!")

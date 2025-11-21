@@ -16,17 +16,24 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { useRouter } from "next/navigation"
+import { Sun, Moon } from "lucide-react"
+
+import { ClientOnly } from "./client-only"
+import { Countdown } from "./countdown"
 
 
 type Props = {
   serverBookings: any[]
   customer: { id: number; name: string; email: string; phone?: string; address?: string }
+   services: any[] 
 }
 
-export function CustomerDashboard({ serverBookings, customer }: Props) {
+export function CustomerDashboard({ serverBookings, customer, services }: Props) {
   const { signOut } = useClerk() 
   const { user } = useUser()
-    const router = useRouter()
+  const router = useRouter()
+
+
   const [bookings] = useState(serverBookings) // local state for future edits
   const [showBookingForm, setShowBookingForm] = useState(false)
 
@@ -56,6 +63,7 @@ export function CustomerDashboard({ serverBookings, customer }: Props) {
           <div className="flex items-center justify-between h-16">
             <h1 className="text-xl font-bold text-primary">PAT PRO CLEANING</h1>
             <div className="flex items-center gap-4">
+              
               <span className="text-sm text-muted-foreground">Welcome, {customer.name}</span>
               <Button variant="outline" size="sm" onClick={() => signOut(() => router.push("/"))}>
                 <LogOut className="h-4 w-4 mr-2" />
@@ -119,15 +127,35 @@ export function CustomerDashboard({ serverBookings, customer }: Props) {
                   {upcoming.map((b) => (
                     <Card key={b.id}>
                       <CardHeader>
-                        <CardTitle>{b.services.map((s: any) => s.service.name).join(", ")}</CardTitle>
-                        <CardDescription>{b.address || customer.address}</CardDescription>
+                        <div className="flex items-start gap-4">
+                          {b.services[0]?.service.imageUrl && (
+                            <img
+                              src={b.services[0].service.imageUrl}
+                              alt=""
+                              className="w-16 h-16 object-cover rounded"
+                            />
+                          )}
+                          <div className="flex-1">
+                            <CardTitle>{b.services.map((s: any) => s.service.name).join(", ")}</CardTitle>
+                            <CardDescription>
+                              {b.services.map((s: any) => (
+                                <span key={s.service.id} className="inline-block mr-2 mb-1 px-2 py-1 text-xs bg-primary/10 text-primary rounded">
+                                  {s.service.category}
+                                </span>
+                              ))}
+                            </CardDescription>
+                          </div>
+                        </div>
                       </CardHeader>
                       <CardContent>
                         <div className="flex items-center gap-4 text-sm text-muted-foreground">
                           <div className="flex items-center gap-2">
-                            <Calendar className="h-4 w-4" />
-                            {new Date(b.bookingDate).toLocaleDateString()}
-                          </div>
+                          <Calendar className="h-4 w-4" />
+                          {new Date(b.bookingDate).toLocaleDateString()}
+                          <ClientOnly>
+                            <Countdown date={new Date(b.bookingDate)} />
+                          </ClientOnly>
+                        </div>
                           <div className="flex items-center gap-2">
                             <Clock className="h-4 w-4" />
                             {new Date(b.bookingDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -180,6 +208,11 @@ export function CustomerDashboard({ serverBookings, customer }: Props) {
                             {new Date(b.bookingDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </div>
                         </div>
+                         <div className="flex items-center justify-between text-sm text-muted-foreground mt-2">
+                            <span>
+                              Total: <span className="font-semibold text-foreground">${b.services.reduce((sum: number, s: any) => sum + s.service.price * s.qty, 0)}</span>
+                            </span>
+                          </div>
                         <Button
                         variant="outline"
                         size="sm"
@@ -208,7 +241,7 @@ export function CustomerDashboard({ serverBookings, customer }: Props) {
           </TabsContent>
 
           <TabsContent value="new">
-           <BookingForm services={bookings.length > 0 ? bookings[0].services.map((s: any) => s.service) : []} />
+           <BookingForm services={services} onSuccess={() => { setShowBookingForm(false); toast.success("Booking created!") }} />
           </TabsContent>
 
           <TabsContent value="profile">

@@ -1,7 +1,7 @@
 import { Resend } from "resend"
 
-const resend = new Resend(process.env.RESEND_API_KEY)
-const from = process.env.FROM_EMAIL as string
+const resend = new Resend(process.env.NEXT_PUBLIC_RESEND_API_KEY)
+const from = process.env.NEXT_PUBLIC_FROM_EMAIL as string
 
 export async function sendBookingUpdate(
   to: string,
@@ -29,4 +29,56 @@ export async function sendBookingUpdate(
   `
 
   await resend.emails.send({ from, to, subject, html })
+}
+
+export async function sendCustomerConfirmation(
+  to: string,
+  customerName: string,
+  bookingId: number,
+  serviceNames: string,
+  date: string
+) {
+  const html = `
+    <p>Hi ${customerName},</p>
+    <p>Your cleaning is <strong>confirmed</strong> for <strong>${new Date(date).toLocaleString()}</strong>.</p>
+    <ul>
+      <li>Services: ${serviceNames}</li>
+      <li>Booking ID: #${bookingId}</li>
+    </ul>
+    <p>Our pro will arrive on time. You can reschedule or cancel anytime from your dashboard.</p>
+    <p>Thanks for choosing Pat Pro! 🧼</p>
+  `
+
+  await resend.emails.send({
+    from: process.env.NEXT_PUBLIC_FROM_EMAIL as string,
+    to,
+    subject: "✅ Cleaning Confirmed – See You Soon!",
+    html,
+  })
+}
+
+export async function notifyAdminNewBooking(
+  bookingId: number,
+  customerName: string,
+  customerEmail: string,
+  serviceNames: string,
+  date: string
+) {
+  const html = `
+    <p>New booking received!</p>
+    <ul>
+      <li>Booking ID: #${bookingId}</li>
+      <li>Customer: ${customerName} (${customerEmail})</li>
+      <li>Services: ${serviceNames}</li>
+      <li>Date: ${new Date(date).toLocaleString()}</li>
+    </ul>
+    <p><a href="https://yourdomain.com/admin">View in admin dashboard</a></p>
+  `
+
+  await resend.emails.send({
+    from: process.env.NEXT_PUBLIC_FROM_EMAIL as string,
+    to: process.env.ADMIN_EMAIL as string, // new env var
+    subject: `New Booking #${bookingId} – Action Required`,
+    html,
+  })
 }

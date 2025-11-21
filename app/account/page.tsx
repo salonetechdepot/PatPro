@@ -7,6 +7,8 @@ export default async function AccountPage() {
   const session = await auth()
   if (!session?.userId) redirect("/sign-in")
 
+  const allServices = await prisma.service.findMany({ orderBy: { id: "asc" } })
+
   // 1. ensure customer row exists (auto-create if first visit)
   let customer = await prisma.customer.findUnique({ where: { clerkId: session.userId } })
   if (!customer) {
@@ -26,5 +28,5 @@ export default async function AccountPage() {
     orderBy: { bookingDate: "desc" },
   })
 
-  return <CustomerDashboard serverBookings={bookings} customer={customer} />
+ return <CustomerDashboard serverBookings={bookings} customer={customer} services={allServices} />
 }

@@ -145,6 +145,7 @@ export function BookingCTA({ services }: Props) {
             <div className="p-6">
              <BookingForm
                 services={services}
+                customer={user ? { email: user.primaryEmailAddress?.emailAddress, name: user.fullName } : undefined}
                 onSuccess={() => {
                     setShowForm(false)
                     toast.success("Booking submitted!")

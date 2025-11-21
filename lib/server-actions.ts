@@ -2,7 +2,9 @@
 
 import { prisma } from "./prisma"
 import { revalidatePath } from "next/cache"
-import {sendBookingUpdate} from "../lib/mailer"
+import {notifyAdminNewBooking, sendBookingUpdate} from "../lib/mailer"
+import { send24hReminder } from "../lib/reminders"
+import { sendCustomerConfirmation } from "../lib/mailer"
 
 
 export async function createService(data: {
@@ -42,7 +44,7 @@ export async function updateService(
 
 //Bookinf action
 export async function createBooking(data: {
-  serviceIds: number[] // can be multiple
+  serviceIds: number[]
   bookingDate: Date
   address?: string
   notes?: string
@@ -67,20 +69,44 @@ export async function createBooking(data: {
     })
   }
 
-  // 2. create booking
+  // 2. create booking with include
   const booking = await prisma.booking.create({
     data: {
       customerId: customer.id,
       bookingDate: data.bookingDate,
       status: "PENDING",
       notes: data.notes,
-      services: {
-        create: data.serviceIds.map((sid) => ({ serviceId: sid, qty: 1 })),
-      },
+      services: { create: data.serviceIds.map((id) => ({ serviceId: id, qty: 1 })) },
     },
+    include: { services: { include: { service: true } } }, // ⬅ required for email
   })
 
-  revalidatePath("/admin")
+  // 3. send friendly confirmation
+  await sendCustomerConfirmation(
+    customer.email,
+    customer.name,
+    booking.id,
+    booking.services.map((s) => s.service.name).join(", "),
+    booking.bookingDate.toISOString()
+  )
+
+ // 4. schedule 24 h reminder (email + SMS to customer & email to admin)
+const reminderTime = new Date(booking.bookingDate.getTime() - 24 * 60 * 60 * 1000)
+setTimeout(() => send24hReminder(
+  { name: customer.name, email: customer.email, phone: customer.phone || undefined },
+  booking
+), reminderTime.getTime() - Date.now())
+
+  // 4. notify admin
+  await notifyAdminNewBooking(
+  booking.id,
+  customer.name,
+  customer.email,
+  booking.services.map((s) => s.service.name).join(", "),
+  booking.bookingDate.toISOString()
+)
+
+  revalidatePath("/account")
   return booking
 }
 
