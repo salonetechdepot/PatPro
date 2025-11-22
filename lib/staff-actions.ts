@@ -29,6 +29,9 @@ export async function inviteStaff(data: { name: string; email: string; phone?: s
   const session = await auth()
   if (!session?.userId) throw new Error("Unauthorized")
 
+    const existing = await prisma.staff.findFirst({ where: { email: data.email } })
+    if (existing) throw new Error("Staff with this email already exists.")
+
   const res = await fetch("https://api.clerk.com/v1/invitations", {
   method: "POST",
   headers: {

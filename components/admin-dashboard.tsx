@@ -127,6 +127,8 @@ export function AdminDashboard({
 
   const [filePreview, setFilePreview] = useState<string | null>(null)
 
+  const [inviting, setInviting] = useState(false)
+
   
 
   
@@ -742,7 +744,7 @@ const colors: Record<BookingStatus, string> = {
                     <CardTitle>Staff Management</CardTitle>
                     <CardDescription>Manage your cleaning staff and assignments</CardDescription>
                   </div>
-                  <Dialog>
+                  {/* <Dialog>
                     <DialogTrigger asChild>
                       <Button>
                         <Plus className="h-4 w-4 mr-2" />
@@ -785,7 +787,7 @@ const colors: Record<BookingStatus, string> = {
                         <Button type="submit">Add Staff Member</Button>
                       </DialogFooter>
                     </DialogContent>
-                  </Dialog>
+                  </Dialog> */}
                 </div>
               </CardHeader>
               <CardContent>
@@ -825,9 +827,16 @@ const colors: Record<BookingStatus, string> = {
                     <form
                       onSubmit={async (e) => {
                         e.preventDefault()
-                        await inviteStaff(staffForm)
-                        setAddStaffOpen(false)
-                        toast.success("Invitation sent")
+                        setInviting(true)
+                        try {
+                          await inviteStaff(staffForm)
+                          toast.success("Invitation sent")
+                          setAddStaffOpen(false)
+                        } catch (err: any) {
+                          toast.error(err.message)
+                        } finally {
+                          setInviting(false)
+                        }
                       }}
                     >
                       <DialogHeader>
@@ -842,8 +851,8 @@ const colors: Record<BookingStatus, string> = {
                         <Input value={staffForm.phone} onChange={(e) => setStaffForm({ ...staffForm, phone: e.target.value })} />
                         <Label>Role</Label>
                         <Select value={staffForm.role} onValueChange={(v) => setStaffForm({ ...staffForm, role: v })}>
-  <SelectTrigger>
-    <SelectValue />
+                        <SelectTrigger>
+                          <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="cleaner">Cleaner</SelectItem>
@@ -852,7 +861,9 @@ const colors: Record<BookingStatus, string> = {
                       </Select>
                       </div>
                       <DialogFooter>
-                        <Button type="submit">Send Invitation</Button>
+                        <Button type="submit" disabled={inviting}>
+                          {inviting ? "Sending…" : "Send Invitation"}
+                        </Button>
                       </DialogFooter>
                     </form>
                   </DialogContent>
