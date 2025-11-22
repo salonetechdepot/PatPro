@@ -29,6 +29,7 @@ type Props = {
 }
 
 export function CustomerDashboard({ serverBookings, customer, services }: Props) {
+  if (!customer) return <p>Loading customer…</p>
   const { signOut } = useClerk() 
   const { user } = useUser()
   const router = useRouter()

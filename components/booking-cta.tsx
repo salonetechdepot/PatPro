@@ -2,7 +2,6 @@
 
 import { useState } from "react"
 import {  useUser } from "@clerk/nextjs"
-import { signIn } from "@clerk/nextjs"
 import { BookingForm } from "../components/booking-form"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -13,6 +12,7 @@ type Props = { services: any[] }
 
 export function BookingCTA({ services }: Props) {
     
+  
   const { user, isLoaded } = useUser()
   const [showForm, setShowForm] = useState(false)
 
@@ -34,7 +34,7 @@ export function BookingCTA({ services }: Props) {
               Book Now <ChevronRight className="ml-2 h-5 w-5" />
             </Button>
           ) : (
-            <Button size="lg" onClick={() => signIn()}>
+            <Button size="lg" onClick={() => window.location.href = "/sign-in"}>
               Sign In to Book
             </Button>
           )}
