@@ -91,11 +91,19 @@ export async function createBooking(data: {
   )
 
  // 4. schedule 24 h reminder (email + SMS to customer & email to admin)
-const reminderTime = new Date(booking.bookingDate.getTime() - 24 * 60 * 60 * 1000)
+// const reminderTime = new Date(booking.bookingDate.getTime() - 24 * 60 * 60 * 1000)
+// setTimeout(() => send24hReminder(
+//   { name: customer.name, email: customer.email, phone: customer.phone || undefined },
+//   booking
+// ), reminderTime.getTime() - Date.now())
+
+//testing immediate reminder
+// 1-minute reminder for testing
+const reminderTime = new Date(Date.now() + 1 * 60 * 1000) // 1 min from now
 setTimeout(() => send24hReminder(
   { name: customer.name, email: customer.email, phone: customer.phone || undefined },
   booking
-), reminderTime.getTime() - Date.now())
+), 1 * 60 * 1000)
 
   // 4. notify admin
   await notifyAdminNewBooking(

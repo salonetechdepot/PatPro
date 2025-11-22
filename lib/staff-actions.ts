@@ -38,7 +38,7 @@ export async function inviteStaff(data: { name: string; email: string; phone?: s
   body: JSON.stringify({
     email_address: data.email,
     public_metadata: { role: "staff", invitedBy: session.userId },
-    redirect_url: `http://localhost:3000/staff`,
+    redirect_url: `https://patpro.onrender.com/staff`,
   }),
 })
 const invite = await res.json()
