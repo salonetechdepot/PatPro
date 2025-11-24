@@ -29,28 +29,30 @@ export async function inviteStaff(data: { name: string; email: string; phone?: s
   const session = await auth()
   if (!session?.userId) throw new Error("Unauthorized")
 
-    const existing = await prisma.staff.findFirst({ where: { email: data.email } })
-    if (existing) throw new Error("Staff with this email already exists.")
+  // duplicate check
+  const existing = await prisma.staff.findFirst({ where: { email: data.email } })
+  if (existing) return { ok: false, message: "Staff with this email already exists." }
 
+  // invite to Clerk
   const res = await fetch("https://api.clerk.com/v1/invitations", {
-  method: "POST",
-  headers: {
-    Authorization: `Bearer ${process.env.CLERK_SECRET_KEY}`,
-    "Content-Type": "application/json",
-  },
-  body: JSON.stringify({
-    email_address: data.email,
-    public_metadata: { role: "staff", invitedBy: session.userId },
-    redirect_url: `https://patpro.onrender.com/staff`,
-  }),
-})
-const invite = await res.json()
-console.log("Clerk response", invite) // ⬅ add this
-if (!invite.id) throw new Error(`Clerk invite failed: ${JSON.stringify(invite)}`)
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${process.env.CLERK_SECRET_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      email_address: data.email,
+      public_metadata: { role: "staff", invitedBy: session.userId },
+      redirect_url: `${process.env.NEXT_PUBLIC_URL}/staff`,
+    }),
+  }).then((r) => r.json())
 
+  if (!res.id) return { ok: false, message: "Clerk invite failed." }
+
+  // create staff row
   await prisma.staff.create({
     data: {
-      clerkId: `invite_${invite.id}`,
+      clerkId: `invite_${res.id}`,
       name: data.name,
       email: data.email,
       phone: data.phone,
@@ -59,5 +61,5 @@ if (!invite.id) throw new Error(`Clerk invite failed: ${JSON.stringify(invite)}`
     },
   })
 
-  revalidatePath("/admin")
+  return { ok: true, message: "Invitation sent." }
 }
