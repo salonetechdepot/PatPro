@@ -47,6 +47,7 @@ import { createService } from "../lib/server-actions"
 import { deleteService } from "../lib/server-actions"
 import { updateService } from "../lib/server-actions"
 import { confirmBooking, cancelBooking, completeBooking } from "../lib/server-actions"
+import { assignStaffToBooking} from "../lib/staff-actions"
 
 type Props = { 
   serverServices: any[] 
@@ -485,6 +486,19 @@ const colors: Record<BookingStatus, string> = {
                               </p>
                             </div>
                             {getStatusBadge(b.status)}
+                            <select
+                              value={b.assignedStaffId ?? ""}
+                              onChange={async (e) => {
+                                await assignStaffToBooking(b.id, e.target.value ? Number(e.target.value) : null)
+                                router.refresh()
+                              }}
+                              className="mt-2 text-sm border rounded px-2 py-1"
+                            >
+                              <option value="">Unassigned</option>
+                              {serverStaff.map((s) => (
+                                <option key={s.id} value={s.id}>{s.name}</option>
+                              ))}
+                            </select>
                           </div>
                         ))}
                       </div>

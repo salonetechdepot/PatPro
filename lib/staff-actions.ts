@@ -42,7 +42,7 @@ export async function inviteStaff(data: { name: string; email: string; phone?: s
     },
     body: JSON.stringify({
       email_address: data.email,
-      public_metadata: { role: "staff", invitedBy: session.userId },
+      public_metadata: { role: data.role, invitedBy: session.userId },
       redirect_url: `${process.env.NEXT_PUBLIC_URL}/staff`,
     }),
   }).then((r) => r.json())
@@ -62,4 +62,13 @@ export async function inviteStaff(data: { name: string; email: string; phone?: s
   })
 
   return { ok: true, message: "Invitation sent." }
+}
+
+export async function assignStaffToBooking(bookingId: number, staffId: number | null) {
+  "use server"
+  await prisma.booking.update({
+    where: { id: bookingId },
+    data: { assignedStaffId: staffId },
+  })
+  revalidatePath("/admin")
 }
